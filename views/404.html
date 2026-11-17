@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Not found — {{siteTitle}}</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=JetBrains+Mono&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/base.css">
+  <style>
+    :root { --accent: {{accent}}; }
+    main { min-height: 100svh; display: grid; place-content: center; text-align: center; gap: 28px; padding: 24px; }
+    .cube { width: 90px; margin: 0 auto; animation: float 4s ease-in-out infinite; }
+    .cube path { fill: none; stroke: var(--line-2); }
+    .cube path:first-child { stroke: var(--accent); }
+    h1 { font-family: var(--f-display); font-weight: 400; font-size: clamp(44px, 8vw, 96px); line-height: .95; margin: 0; }
+    h1 em { color: var(--muted); }
+    a.meta:hover { color: var(--accent); }
+    @keyframes float { 50% { transform: translateY(-12px); } }
+  </style>
+</head>
+<body>
+  <div class="grain" aria-hidden="true"></div>
+  <main>
+    <svg class="cube" viewBox="0 0 26 30" aria-hidden="true"><path d="M13 .5 25.5 7.5 13 14.5.5 7.5Z"/><path d="M.5 7.5 13 14.5v15L.5 22.5Z"/><path d="M25.5 7.5 13 14.5v15l12.5-7Z"/></svg>
+    <h1>This cube<br><em>is empty.</em></h1>
+    <a class="meta" href="/">← Back to {{siteTitle}}</a>
+  </main>
+</body>
+</html>

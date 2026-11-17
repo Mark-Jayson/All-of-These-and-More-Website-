@@ -1,0 +1,19 @@
+{
+  "name": "all-of-these-and-more",
+  "version": "1.0.0",
+  "main": "server.js",
+  "scripts": {
+    "start": "node --env-file-if-exists=.env server.js",
+    "dev": "node --watch --env-file-if-exists=.env server.js",
+    "seed": "node scripts/seed.js"
+  },
+  "license": "ISC",
+  "description": "A dark, minimalist publishing site for essays and blogs.",
+  "dependencies": {
+    "express": "^5.3.0",
+    "marked": "^18.2.1",
+    "multer": "^2.5.0"
+  },
+  "type": "module",
+  "private": true
+}

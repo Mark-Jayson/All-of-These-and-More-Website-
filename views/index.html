@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{siteTitle}}</title>
+  <meta name="description" content="{{description}}">
+  <meta property="og:title" content="{{siteTitle}}">
+  <meta property="og:description" content="{{description}}">
+  <meta name="theme-color" content="#09090a">
+  <link rel="alternate" type="application/rss+xml" title="{{siteTitle}}" href="/rss.xml">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,300..600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/home.css">
+  <style>:root { --accent: {{accent}}; }</style>
+</head>
+<body class="home">
+  <div class="grain" aria-hidden="true"></div>
+
+  <header class="topbar" id="topbar">
+    <a class="wordmark" href="/" aria-label="{{siteTitle}} — home">
+      <svg class="wordmark__cube" viewBox="0 0 26 30" aria-hidden="true"><path d="M13 0 26 7.5 13 15 0 7.5Z" fill="#ece9e2"/><path d="M0 7.5 13 15v15L0 22.5Z" fill="#6d6b66"/><path d="M26 7.5 13 15v15l13-7.5Z" fill="#2a2a2d"/></svg>
+      <span class="hide-xs">{{siteTitle}}</span>
+    </a>
+    <nav class="nav mono">
+      <a href="#index">Index</a>
+      <a href="#about" class="hide-sm">About</a>
+      <button class="kbd" data-open-palette type="button">Search <kbd>⌘K</kbd></button>
+    </nav>
+  </header>
+
+  <main>
+    <!-- ======================================== the cube field -->
+    <section class="stage" id="stage" aria-label="All articles">
+      <div class="stage__intro">
+        <p class="meta stage__kicker"><span class="dot"></span> A personal publication · Vol. {{year}}</p>
+        <h1 class="display" id="title" data-split>{{siteTitle}}</h1>
+        <p class="stage__tagline">{{tagline}}</p>
+        <div class="stage__count"><span class="stage__num">{{count}}</span><span class="meta">pieces<br>in the catalog</span></div>
+        <div class="filters mono" id="filters" role="toolbar" aria-label="Filter by category"></div>
+      </div>
+
+      <div class="field-wrap" id="fieldWrap">
+        <div class="field-grid" id="fieldGrid" aria-hidden="true"></div>
+        <div class="field" id="field"></div>
+      </div>
+
+      <p class="stage__side mono" aria-hidden="true">Essays — Blogs — Notes — Photographs — {{year}}</p>
+      <a class="scroll-cue mono" href="#index"><span>The whole catalog</span><i></i></a>
+
+      <aside class="preview" id="preview" aria-hidden="true">
+        <div class="preview__img"><img alt=""></div>
+        <div class="preview__body">
+          <p class="meta preview__meta"></p>
+          <h2 class="preview__title"></h2>
+          <p class="preview__dek"></p>
+          <span class="preview__cta mono">Read the piece <i>→</i></span>
+        </div>
+      </aside>
+    </section>
+
+    <!-- ======================================== the index -->
+    <section class="index" id="index">
+      <header class="index__head">
+        <h2 class="display index__title">Index</h2>
+        <p class="meta">Every piece, newest first. Hover for a glimpse.</p>
+      </header>
+      <ol class="index__list" id="indexList"></ol>
+      <div class="index__float" id="indexFloat" aria-hidden="true"><img alt=""></div>
+    </section>
+
+    <!-- ======================================== about -->
+    <section class="about" id="about">
+      <p class="meta">About</p>
+      <p class="about__text">{{about}}</p>
+      <p class="meta about__by">— {{author}}</p>
+    </section>
+  </main>
+
+  <footer class="foot mono">
+    <span>© {{year}} {{author}}</span>
+    <span class="foot__links"><a href="/rss.xml">RSS</a><a href="/admin">Editor</a></span>
+  </footer>
+
+  <script src="/js/common.js"></script>
+  <script src="/js/home.js"></script>
+</body>
+</html>
