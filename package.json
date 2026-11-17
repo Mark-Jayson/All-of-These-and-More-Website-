@@ -15,5 +15,8 @@
     "multer": "^2.5.0"
   },
   "type": "module",
-  "private": true
+  "private": true,
+  "engines": {
+    "node": ">=22.9"
+  }
 }

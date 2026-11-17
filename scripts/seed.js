@@ -4,11 +4,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { fileURLToPath } from 'node:url';
+import { DATA_DIR, UPLOAD_DIR } from '../lib/paths.js';
 
-const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
-const DB_FILE = path.join(ROOT, 'data', 'db.json');
-const IMG_DIR = path.join(ROOT, 'public', 'uploads', 'seed');
+const DB_FILE = path.join(DATA_DIR, 'db.json');
+const IMG_DIR = path.join(UPLOAD_DIR, 'seed');
 const force = process.argv.includes('--force');
 
 fs.mkdirSync(path.dirname(DB_FILE), { recursive: true });
@@ -395,4 +394,4 @@ db.articles = pieces.map((p, i) => {
 });
 
 fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2));
-console.log(`Seeded ${db.articles.length} articles with generated covers in public/uploads/seed/.`);
+console.log(`Seeded ${db.articles.length} articles with generated covers in ${IMG_DIR}`);

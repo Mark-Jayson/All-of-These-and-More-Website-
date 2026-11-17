@@ -5,14 +5,15 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as db from './lib/store.js';
+import { UPLOAD_DIR } from './lib/paths.js';
 import { renderMarkdown, readingMinutes, excerptOf } from './lib/markdown.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT) || 3000;
-const UPLOAD_DIR = path.join(__dirname, 'public', 'uploads');
 const VIEWS = path.join(__dirname, 'views');
 
 const app = express();
+app.set('trust proxy', 1); // behind Render/Railway's proxy: real client IPs + HTTPS detection
 app.disable('x-powered-by');
 app.use(express.json({ limit: '5mb' }));
 
@@ -106,7 +107,7 @@ app.post('/api/admin/login', (req, res) => {
   sessions.set(token, Date.now() + SESSION_MS);
   res.setHeader(
     'Set-Cookie',
-    `aotam_session=${token}; HttpOnly; Path=/; SameSite=Strict; Max-Age=${SESSION_MS / 1000}`
+    `aotam_session=${token}; HttpOnly; Path=/; SameSite=Strict; Max-Age=${SESSION_MS / 1000}${req.secure ? '; Secure' : ''}`
   );
   res.json({ ok: true });
 });
@@ -282,6 +283,7 @@ app.get('/rss.xml', (req, res) => {
 
 app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'public', 'admin', 'index.html')));
 
+app.use('/uploads', express.static(UPLOAD_DIR, { maxAge: '7d' }));
 app.use(express.static(path.join(__dirname, 'public'), { extensions: ['html'] }));
 
 app.use((req, res) => res.status(404).type('html').send(template('404.html', siteVars())));
