@@ -25,9 +25,40 @@
     return data;
   }
 
+  // Big photos are resized (2400px long edge) and re-encoded as WebP before upload.
+  // A 6 MB phone shot becomes ~300–600 KB: faster pages, more room in free storage,
+  // and safely under Vercel's 4.5 MB upload limit. GIFs are left alone (animation).
+  const MAX_EDGE = 2400;
+  async function shrink(file) {
+    if (!/^image\/(jpeg|png|webp|avif)$/.test(file.type)) return file;
+    let bmp;
+    try {
+      bmp = await createImageBitmap(file, { imageOrientation: 'from-image' });
+    } catch {
+      return file; // browser can't decode it — send as is
+    }
+    const scale = Math.min(1, MAX_EDGE / Math.max(bmp.width, bmp.height));
+    if (scale === 1 && file.size < 700 * 1024) return file;
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(bmp.width * scale);
+    canvas.height = Math.round(bmp.height * scale);
+    canvas.getContext('2d').drawImage(bmp, 0, 0, canvas.width, canvas.height);
+    bmp.close?.();
+    const encode = (type, q) => new Promise((r) => canvas.toBlob(r, type, q));
+    let out = null;
+    for (const q of [0.82, 0.7, 0.55]) {
+      out = await encode('image/webp', q);
+      if (!out || out.type !== 'image/webp') out = await encode('image/jpeg', q + 0.03); // older Safari
+      if (!out || out.size < 3.8 * 1024 * 1024) break; // stay under the upload limit
+    }
+    if (!out || out.size >= file.size) return file;
+    const name = file.name.replace(/\.\w+$/, '') + (out.type === 'image/webp' ? '.webp' : '.jpg');
+    return new File([out], name, { type: out.type });
+  }
+
   async function uploadImage(file) {
     const fd = new FormData();
-    fd.append('image', file);
+    fd.append('image', await shrink(file));
     return (await api('/api/admin/upload', { method: 'POST', body: fd })).url;
   }
 
@@ -197,7 +228,7 @@
       const id = e.target.closest('[data-del]')?.dataset.del;
       if (!id) return;
       const a = list.find((x) => x.id === id);
-      if (!(await confirmBox('Delete this piece?', `“${a.title}” will be removed for good. Its uploaded images stay in /uploads.`))) return;
+      if (!(await confirmBox('Delete this piece?', `“${a.title}” will be removed for good. Its uploaded images are kept.`))) return;
       await api(`/api/admin/articles/${id}`, { method: 'DELETE' });
       list.splice(list.indexOf(a), 1);
       toast('Deleted');

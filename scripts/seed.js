@@ -1,20 +1,17 @@
 // Seeds sample articles + generated abstract cover art so the site has something to show.
 //   npm run seed            → only if the catalog is empty
-//   npm run seed -- --force → replace everything (keeps your settings)
-import fs from 'node:fs';
-import path from 'node:path';
+//   npm run seed -- --force → replace every article (keeps your settings and login)
+// It writes wherever the site does: local files, or Postgres + Vercel Blob when
+// DATABASE_URL / BLOB_READ_WRITE_TOKEN are set (see `npm run seed:prod`).
 import crypto from 'node:crypto';
-import { DATA_DIR, UPLOAD_DIR } from '../lib/paths.js';
+import * as store from '../lib/store.js';
+import { saveImage, usesBlob } from '../lib/media.js';
 
-const DB_FILE = path.join(DATA_DIR, 'db.json');
-const IMG_DIR = path.join(UPLOAD_DIR, 'seed');
 const force = process.argv.includes('--force');
 
-fs.mkdirSync(path.dirname(DB_FILE), { recursive: true });
-fs.mkdirSync(IMG_DIR, { recursive: true });
-const db = fs.existsSync(DB_FILE) ? JSON.parse(fs.readFileSync(DB_FILE, 'utf8')) : { settings: {}, articles: [] };
-if (db.articles.length && !force) {
-  console.log('Catalog already has articles — run `npm run seed -- --force` to replace them.');
+await store.ready();
+if ((await store.articles()).length && !force) {
+  console.log('Catalog already has articles — run the seed with `-- --force` to replace them.');
   process.exit(0);
 }
 
@@ -131,11 +128,12 @@ const ART = {
   },
 };
 
+const images = []; // [placeholder, svg] — saved after the articles are built
 function art(name, kind, paletteIdx, s) {
   seed = s;
-  const file = `${name}.svg`;
-  fs.writeFileSync(path.join(IMG_DIR, file), ART[kind](PALETTES[paletteIdx % PALETTES.length]));
-  return `/uploads/seed/${file}`;
+  const ref = `@@seed/${name}.svg@@`;
+  images.push([ref, ART[kind](PALETTES[paletteIdx % PALETTES.length])]);
+  return ref;
 }
 
 /* ------------------------------------------------------------ sample writing */
@@ -369,7 +367,7 @@ A cube is the simplest object that has an inside. That felt right for a collecti
 ];
 
 const now = new Date().toISOString();
-db.articles = pieces.map((p, i) => {
+const list = pieces.map((p, i) => {
   const slug = p.title.toLowerCase().replace(/[’']/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
   const cover = art(`${slug}`, p.art[0], p.art[1], 1000 + i * 77);
   const kinds = Object.keys(ART);
@@ -393,5 +391,11 @@ db.articles = pieces.map((p, i) => {
   };
 });
 
-fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2));
-console.log(`Seeded ${db.articles.length} articles with generated covers in ${IMG_DIR}`);
+console.log(`Saving ${images.length} cover images ${usesBlob() ? 'to Vercel Blob' : 'to disk'}…`);
+let json = JSON.stringify(list);
+for (const [ref, svg] of images) {
+  const url = await saveImage(svg, 'image/svg+xml', ref.slice(2, -2));
+  json = json.replaceAll(ref, url);
+}
+await store.replaceArticles(JSON.parse(json));
+console.log(`Seeded ${list.length} articles into ${store.backend()} storage.`);
