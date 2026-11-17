@@ -47,8 +47,22 @@
     document.querySelectorAll('.stage__kicker, .stage__tagline, .stage__count, .filters, .scroll-cue, .stage__side').forEach((el, i) => {
       el.classList.add('fade-in');
       el.style.setProperty('--d', `${450 + i * 90}ms`);
+      // drop the one-off entrance so later transitions (title ⇄ preview) can move it
+      el.addEventListener('animationend', () => el.classList.remove('fade-in'), { once: true });
     });
+    const spans = h.querySelectorAll('.split-word > span');
+    const done = () => h.classList.add('is-ready');
+    if (reduced || !spans.length) done();
+    else spans[spans.length - 1].addEventListener('animationend', done, { once: true });
   }
+
+  // split a title into words that can rise in one by one
+  const splitWords = (text) =>
+    text
+      .trim()
+      .split(/\s+/)
+      .map((w, i) => `<span class="split-word"><span style="--i:${i}">${esc(w)}</span></span>`)
+      .join(' ');
 
   /* ================================================================ layout */
   function cubeSize() {
@@ -157,7 +171,7 @@
   function cubeEl(p) {
     const s = parseFloat(field.style.getPropertyValue('--s')) || 84;
     const W = s * SQ3;
-    const socket = `<svg class="cube__socket" viewBox="0 0 ${W} ${2 * s}" aria-hidden="true"><path d="${hexLines(s)}"/><polygon points="${hexPoly(s)}"/></svg>`;
+    const socket = `<svg class="cube__socket" viewBox="0 0 ${W} ${2 * s}" aria-hidden="true"><path pathLength="1" d="${hexLines(s)}"/><polygon points="${hexPoly(s)}"/></svg>`;
 
     if (p.kind === 'ghost') {
       const el = document.createElement('div');
@@ -211,53 +225,99 @@
   }
 
   /* ================================================================ hover + preview */
+  // Pointer: hovering a cube for DWELL ms turns the hero title into a preview card
+  //          (the cube's outline traces itself meanwhile). Once open, other cubes swap in at once.
+  // Keyboard: focusing a cube opens the card straight away.
+  // Touch: first tap shows a bottom sheet, second tap opens the piece.
+  const DWELL = 1000;
+  const intro = $('#intro');
+  const card = $('#introCard');
   let hot = null;
-  let clearT;
+  let clearT, dwellT, closeT, backT;
+  let shown = null; // id of the article in the card
 
-  function setHot(cube) {
+  function setHot(cube, { instant = false } = {}) {
     clearTimeout(clearT);
     if (cube === hot) return;
     hot?.classList.remove('is-hot');
     hot = cube;
     field.classList.toggle('has-hot', !!cube);
     if (!cube) {
-      preview.classList.remove('is-on');
+      clearTimeout(dwellT);
+      if (touch) preview.classList.remove('is-on');
+      else scheduleClose();
       return;
     }
     cube.classList.add('is-hot');
-    showPreview(cube);
+    if (touch) return showSheet(cube);
+    clearTimeout(closeT);
+    clearTimeout(dwellT);
+    if (shown || instant) openCard(cube);
+    else dwellT = setTimeout(() => openCard(cube), DWELL);
   }
   const clearHot = () => {
     clearTimeout(clearT);
     clearT = setTimeout(() => setHot(null), 70);
   };
+  function scheduleClose() {
+    clearTimeout(closeT);
+    closeT = setTimeout(closeCard, 450);
+  }
 
-  function showPreview(cube) {
-    const a = all.find((x) => x.id === cube.dataset.id);
+  const articleOf = (cube) => all.find((x) => x.id === cube.dataset.id);
+  const metaOf = (a) => `<b>№ ${numberOf.get(a.id)}</b> · ${esc(a.category)} · ${fmtDate(a.publishedAt)} · ${a.readingMinutes} min`;
+
+  function openCard(cube) {
+    const a = articleOf(cube);
+    if (!a || a.id === shown) return;
+    const first = !shown;
+    shown = a.id;
+    card.href = `/article/${a.slug}`;
+    $('img', card).src = a.cover;
+    $('img', card).alt = a.coverAlt || '';
+    $('.intro__meta', card).innerHTML = metaOf(a);
+    $('.intro__title', card).innerHTML = splitWords(a.title);
+    $('.intro__dek', card).textContent = a.excerpt;
+    card.setAttribute('aria-hidden', 'false');
+    card.tabIndex = 0;
+    // restart the entrance animations for the new content
+    card.classList.remove('is-swap');
+    void card.offsetWidth;
+    card.classList.add('is-swap');
+    if (first) {
+      clearTimeout(backT);
+      intro.classList.remove('is-back');
+      intro.classList.add('is-previewing');
+      field.classList.add('is-previewing');
+    }
+  }
+
+  function closeCard() {
+    if (!shown) return;
+    shown = null;
+    card.setAttribute('aria-hidden', 'true');
+    card.tabIndex = -1;
+    intro.classList.remove('is-previewing');
+    field.classList.remove('is-previewing');
+    if (reduced) return;
+    // words rise back in, like on first load
+    intro.classList.add('is-back');
+    clearTimeout(backT);
+    backT = setTimeout(() => intro.classList.remove('is-back'), 2000);
+  }
+
+  // touch-only bottom sheet
+  function showSheet(cube) {
+    const a = articleOf(cube);
     if (!a) return;
-    const wasOn = preview.classList.contains('is-on');
     $('img', preview).src = a.cover;
     $('img', preview).alt = a.coverAlt || '';
-    $('.preview__meta', preview).innerHTML = `<b>№ ${numberOf.get(a.id)}</b> · ${esc(a.category)} · ${fmtDate(a.publishedAt)} · ${a.readingMinutes} min`;
+    $('.preview__meta', preview).innerHTML = metaOf(a);
     $('.preview__title', preview).textContent = a.title;
     $('.preview__dek', preview).textContent = a.excerpt;
     preview.classList.remove('is-swap');
     void preview.offsetWidth;
     preview.classList.add('is-swap');
-
-    if (!touch) {
-      const r = cube.getBoundingClientRect();
-      const pw = preview.offsetWidth;
-      const ph = preview.offsetHeight;
-      let x = r.right + 12;
-      if (x + pw > innerWidth - 16) x = r.left - pw - 12;
-      x = Math.max(16, x);
-      const lift = parseFloat(getComputedStyle(field).getPropertyValue('--s')) * 0.26;
-      const y = Math.min(innerHeight - ph - 16, Math.max(76, r.top + r.height / 2 - ph / 2 - lift));
-      preview.classList.toggle('no-glide', !wasOn);
-      preview.style.setProperty('--x', `${x}px`);
-      preview.style.setProperty('--y', `${y}px`);
-    }
     requestAnimationFrame(() => preview.classList.add('is-on'));
     preview.dataset.href = `/article/${a.slug}`;
   }
@@ -270,10 +330,25 @@
   field.addEventListener('pointerleave', () => !touch && clearHot());
   field.addEventListener('focusin', (e) => {
     const c = e.target.closest('.cube.is-article');
-    if (c) setHot(c);
+    // keyboard focus only: a tap also focuses the link, and must not count as "already selected"
+    if (c && c.matches(':focus-visible')) setHot(c, { instant: true });
   });
   field.addEventListener('focusout', () => clearHot());
-  addEventListener('scroll', () => hot && !touch && setHot(null), { passive: true });
+
+  // moving onto the card keeps it open (and its cube lit) so it can be clicked
+  card.addEventListener('pointerenter', () => {
+    clearTimeout(closeT);
+    clearTimeout(clearT);
+    const c = shown && field.querySelector(`.cube.is-article[data-id="${shown}"]`);
+    if (c && c !== hot) setHot(c);
+  });
+  card.addEventListener('pointerleave', () => clearHot());
+  card.addEventListener('focusout', () => clearHot());
+  card.addEventListener('click', () => {
+    $('.intro__title', card).style.viewTransitionName = 'title';
+  });
+
+  addEventListener('scroll', () => hot && !touch && scrollY > innerHeight * 0.5 && setHot(null), { passive: true });
 
   field.addEventListener('click', (e) => {
     const c = e.target.closest('.cube.is-article');
@@ -286,7 +361,7 @@
     if (e.metaKey || e.ctrlKey || e.shiftKey) return;
     // hand the cover + title over to the article page (cross-document view transition)
     $('.f--left img', c).style.viewTransitionName = 'cover';
-    if (preview.classList.contains('is-on') && !touch) $('.preview__title', preview).style.viewTransitionName = 'title';
+    if (shown === c.dataset.id) $('.intro__title', card).style.viewTransitionName = 'title';
   });
   preview.addEventListener('click', () => preview.dataset.href && (location.href = preview.dataset.href));
   document.addEventListener('click', (e) => {
@@ -297,6 +372,12 @@
   addEventListener('pageshow', () => {
     document.querySelectorAll('[style*="view-transition-name"]').forEach((el) => (el.style.viewTransitionName = ''));
     setHot(null);
+    clearTimeout(closeT);
+    shown = null;
+    card.setAttribute('aria-hidden', 'true');
+    card.tabIndex = -1;
+    intro.classList.remove('is-previewing', 'is-back');
+    field.classList.remove('is-previewing');
   });
 
   /* ================================================================ parallax + idle life */
@@ -367,48 +448,60 @@
         (a) => `<li class="row reveal" data-cat="${esc(a.category)}" data-id="${a.id}">
         <a href="/article/${esc(a.slug)}">
           <span class="row__n meta">${numberOf.get(a.id)}</span>
-          <span class="row__t">${esc(a.title)}<em>${esc(a.excerpt)}</em></span>
+          <span class="row__t">${esc(a.title)}</span>
           <span class="row__c meta">${esc(a.category)}</span>
           <span class="row__d meta">${fmtDate(a.publishedAt)}</span>
           <span class="row__r meta">${a.readingMinutes} min</span>
+          <span class="row__panel" aria-hidden="true"><span class="row__panel-in">
+            <span class="row__img"><img alt="" data-src="${esc(a.cover)}" decoding="async"></span>
+            <span class="row__ex">${esc(a.excerpt)}</span>
+          </span></span>
         </a></li>`
       )
       .join('');
 
-    // image that trails the cursor over the list
-    const float = $('#indexFloat');
-    const img = $('img', float);
-    let x = 0, y = 0, fx = 0, fy = 0, raf = 0, hotRow = null;
-    const loop = () => {
-      const vx = x - fx;
-      fx += vx * 0.14;
-      fy += (y - fy) * 0.14;
-      float.style.setProperty('--x', `${fx + 28}px`);
-      float.style.setProperty('--y', `${fy - 170}px`);
-      float.style.setProperty('--r', `${Math.max(-8, Math.min(8, vx * 0.06))}deg`);
-      raf = Math.abs(x - fx) + Math.abs(y - fy) > 0.3 ? requestAnimationFrame(loop) : 0;
+    // Hovering a row opens a panel under it: the picture on top, then the excerpt.
+    // A short hover-intent delay stops rows flapping open while the cursor sweeps past.
+    let openRow = null, intentT, shutT;
+    const load = (row) => {
+      const img = $('.row__img img', row);
+      if (img && !img.src) img.src = img.dataset.src;
     };
-    list.addEventListener('pointermove', (e) => {
-      x = e.clientX;
-      y = e.clientY;
-      if (!float.classList.contains('is-on')) { fx = x; fy = y; }
-      if (!raf) raf = requestAnimationFrame(loop);
-      const row = e.target.closest('.row');
-      if (row && row !== hotRow) {
-        hotRow?.classList.remove('is-hot');
-        hotRow = row;
-        row.classList.add('is-hot');
-        list.classList.add('has-hot');
-        const a = all.find((q) => q.id === row.dataset.id);
-        if (a) img.src = a.cover;
-        float.classList.add('is-on');
-      }
-    });
-    list.addEventListener('pointerleave', () => {
-      hotRow?.classList.remove('is-hot');
-      hotRow = null;
+    const open = (row) => {
+      clearTimeout(intentT);
+      clearTimeout(shutT);
+      if (row === openRow) return;
+      openRow?.classList.remove('is-open');
+      openRow = row;
+      load(row);
+      row.classList.add('is-open');
+      list.classList.add('has-hot');
+    };
+    const shut = () => {
+      clearTimeout(intentT);
+      openRow?.classList.remove('is-open');
+      openRow = null;
       list.classList.remove('has-hot');
-      float.classList.remove('is-on');
+    };
+    if (!touch) {
+      list.addEventListener('pointerover', (e) => {
+        const row = e.target.closest('.row[data-id]');
+        if (!row || row === openRow) return clearTimeout(intentT);
+        load(row); // start fetching the picture while the intent timer runs
+        clearTimeout(intentT);
+        intentT = setTimeout(() => open(row), openRow ? 160 : 90);
+      });
+      list.addEventListener('pointerleave', () => {
+        clearTimeout(intentT);
+        shutT = setTimeout(shut, 250);
+      });
+    }
+    list.addEventListener('focusin', (e) => {
+      const row = e.target.closest('.row[data-id]');
+      if (row) open(row);
+    });
+    list.addEventListener('focusout', (e) => {
+      if (!list.contains(e.relatedTarget)) shut();
     });
 
     const io = new IntersectionObserver(

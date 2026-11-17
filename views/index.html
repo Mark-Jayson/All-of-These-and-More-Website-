@@ -35,11 +35,23 @@
   <main>
     <!-- ======================================== the cube field -->
     <section class="stage" id="stage" aria-label="All articles">
-      <div class="stage__intro">
-        <p class="meta stage__kicker"><span class="dot"></span> A personal publication · Vol. {{year}}</p>
-        <h1 class="display" id="title" data-split>{{siteTitle}}</h1>
-        <p class="stage__tagline">{{tagline}}</p>
-        <div class="stage__count"><span class="stage__num">{{count}}</span><span class="meta">pieces<br>in the catalog</span></div>
+      <div class="stage__intro" id="intro">
+        <div class="intro__swap">
+          <div class="intro__home">
+            <p class="meta stage__kicker"><span class="dot"></span> A personal publication · Vol. {{year}}</p>
+            <h1 class="display" id="title" data-split>{{siteTitle}}</h1>
+            <p class="stage__tagline">{{tagline}}</p>
+            <div class="stage__count"><span class="stage__num">{{count}}</span><span class="meta">pieces<br>in the catalog</span></div>
+          </div>
+          <!-- after a 1s hover on a cube, the title block turns into this preview -->
+          <a class="intro__card" id="introCard" href="/" aria-hidden="true" tabindex="-1">
+            <span class="intro__img"><img alt=""></span>
+            <span class="meta intro__meta"></span>
+            <span class="display intro__title"></span>
+            <span class="intro__dek"></span>
+            <span class="intro__cta mono">Read the piece <i>→</i></span>
+          </a>
+        </div>
         <div class="filters mono" id="filters" role="toolbar" aria-label="Filter by category"></div>
       </div>
 
@@ -66,10 +78,9 @@
     <section class="index" id="index">
       <header class="index__head">
         <h2 class="display index__title">Index</h2>
-        <p class="meta">Every piece, newest first. Hover for a glimpse.</p>
+        <p class="meta">Every piece, newest first. Hover to open.</p>
       </header>
       <ol class="index__list" id="indexList"></ol>
-      <div class="index__float" id="indexFloat" aria-hidden="true"><img alt=""></div>
     </section>
 
     <!-- ======================================== about -->
