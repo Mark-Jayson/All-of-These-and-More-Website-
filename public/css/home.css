@@ -165,13 +165,23 @@
   pointer-events: none;
   outline: none;
 }
+/* The lift shadow lives on its own layer and fades with opacity: animating a filter
+   between drop-shadow (hot) and saturate (dimmed) can't interpolate, so it used to snap. */
 .cube__body {
   position: absolute; inset: 0;
-  transition: transform .7s var(--ease), opacity .6s var(--ease), filter .6s var(--ease);
+  transition: transform .7s var(--ease), opacity .6s var(--ease);
+}
+.cube__body::before {
+  content: ''; position: absolute; z-index: -1;
+  left: 8%; right: 8%; top: 52%; height: 44%;
+  background: radial-gradient(closest-side, rgba(0,0,0,.75), rgba(0,0,0,0));
+  opacity: 0; transform: translateY(0) scale(.85);
+  transition: opacity .6s var(--ease), transform .7s var(--ease);
+  pointer-events: none;
 }
 .cube__socket { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
 .cube__socket polygon { pointer-events: all; fill: transparent; }
-.cube__socket path { fill: none; stroke: var(--line-2); stroke-width: 1; vector-effect: non-scaling-stroke; opacity: 0; transition: opacity .5s var(--ease); }
+.cube__socket path { fill: none; stroke: var(--line-2); stroke-width: 1; vector-effect: non-scaling-stroke; opacity: 0; transition: opacity .5s var(--ease), stroke .5s var(--ease); }
 
 /* Three faces of the cube, each a square mapped onto its rhombus */
 .f {
@@ -238,7 +248,8 @@
 
 /* hover / focus — lift, colour, reveal the empty slot */
 .cube.is-hot { z-index: 20; }
-.cube.is-hot .cube__body { transform: translateY(var(--lift)); filter: drop-shadow(0 26px 22px rgba(0,0,0,.65)); }
+.cube.is-hot .cube__body { transform: translateY(var(--lift)); }
+.cube.is-hot .cube__body::before { opacity: 1; transform: translateY(calc(var(--lift) * -1.15)) scale(1.05); }
 .cube.is-hot .cube__socket path {
   opacity: 1; stroke: var(--accent); stroke-opacity: .6;
   stroke-dasharray: 1; stroke-dashoffset: 1; animation: trace 1s linear forwards;
@@ -248,7 +259,7 @@
 .cube.is-hot .f--left img { filter: grayscale(0) contrast(1) brightness(1); transform: scale(1); }
 .cube.is-hot .f--top b { color: var(--accent); }
 .cube.is-hot .f--right .pat { opacity: .9; }
-.field.has-hot .cube.is-article:not(.is-hot) .cube__body { opacity: .38; filter: saturate(0); }
+.field.has-hot .cube.is-article:not(.is-hot) .cube__body { opacity: .38; }
 
 /* filtered out — collapse into a wireframe ghost */
 .cube.is-out { pointer-events: none; }
@@ -343,32 +354,53 @@
 .index__list.has-hot .row:not(.is-open) { opacity: .4; }
 
 /* the panel that opens under a row: picture on top, excerpt below.
-   0fr → 1fr grid rows animate the height smoothly without measuring it. */
+   0fr → 1fr grid rows animate the height without measuring it. Opening and closing share
+   one duration and a soft-start curve, so when the hover moves to another row the one
+   shrinking and the one growing cancel out: the list keeps its height and nothing lurches.
+   The picture is revealed by the panel's own growth (overflow: hidden), so the only other
+   things moving are transform and opacity, which stay on the compositor. */
+/* Rows open the moment the cursor arrives and close slowly once it leaves. Both directions
+   share one duration and curve; a transition interrupted halfway reverses from where it is,
+   so a fast sweep part-opens each row it crosses and lets it glide shut. The curve starts
+   quickly so even a brief pass shows a visible sliver of picture. */
+.row { --glide: cubic-bezier(.3, .6, .2, 1); --glide-t: 1.1s; }
 .row__panel {
   grid-column: 2 / 5;
   display: grid; grid-template-rows: 0fr;
-  transition: grid-template-rows .75s var(--ease);
+  transition: grid-template-rows var(--glide-t) var(--glide);
 }
-.row__panel-in { min-height: 0; overflow: hidden; display: block; }
+.row__panel-in {
+  min-height: 0; overflow: hidden; display: block;
+  transform: translateX(0); transition: transform var(--glide-t) var(--glide);
+}
 .row__img {
   display: block; width: min(100%, 720px); aspect-ratio: 21 / 9; overflow: hidden;
   margin-top: 22px; background: var(--bg-3); border: 1px solid var(--line);
-  clip-path: inset(0 0 100% 0);
-  transition: clip-path .8s var(--ease);
+  opacity: 0; transition: opacity .8s var(--glide);
+  contain: paint;
 }
-.row__img img { width: 100%; height: 100%; object-fit: cover; transform: scale(1.12); transition: transform 1.3s var(--ease); }
+.row__img img {
+  width: 100%; height: 100%; object-fit: cover;
+  transform: scale(1.08); transition: transform 1.3s var(--glide);
+  backface-visibility: hidden;
+}
 .row__ex {
   display: block; max-width: 62ch; padding: 16px 0 6px;
   font-family: var(--f-serif); font-size: 16px; line-height: 1.5; color: var(--muted);
-  opacity: 0; transform: translateY(10px);
-  transition: opacity .5s var(--ease), transform .7s var(--ease);
+  opacity: 0; transform: translateY(8px);
+  transition: opacity .6s var(--glide), transform .9s var(--glide);
 }
 .row.is-open .row__panel { grid-template-rows: 1fr; }
-.row__panel-in { transform: translateX(0); transition: transform .6s var(--ease); }
 .row.is-open .row__panel-in { transform: translateX(14px); }
-.row.is-open .row__img { clip-path: inset(0); transition-delay: .08s; }
+.row.is-open .row__img { opacity: 1; transition-duration: .7s; }
 .row.is-open .row__img img { transform: none; }
-.row.is-open .row__ex { opacity: 1; transform: none; transition-delay: .25s; }
+.row.is-open .row__ex { opacity: 1; transform: none; transition-delay: .15s; }
+/* the title and wash glide with the panel instead of jumping */
+.row__t { transition: transform var(--glide-t) var(--glide); }
+.row a::before { transition-duration: var(--glide-t); transition-timing-function: var(--glide); }
+.row__n { transition: color .6s var(--glide); }
+.row { transition: opacity .8s var(--glide); }
+.row.reveal.is-in { transition: opacity .8s var(--glide), transform 1s var(--ease); }
 @media (hover: none) { .row__panel { display: none; } }
 
 @media (max-width: 900px) {
@@ -386,7 +418,6 @@
 
 .reveal { opacity: 0; transform: translateY(24px); transition: opacity 1s var(--ease), transform 1s var(--ease); }
 .reveal.is-in { opacity: 1; transform: none; }
-.row.reveal.is-in { transition: opacity .45s var(--ease), transform 1s var(--ease); }
 
 /* ---------------------------------------------------- responsive stage */
 @media (max-width: 1000px) {
@@ -405,4 +436,15 @@
   .stage__intro.is-previewing h1.is-ready .split-word > span { transform: none; }
   .stage__intro.is-previewing .intro__home { opacity: 0; }
   .intro__card, .stage__intro.is-previewing .intro__card { transform: none; }
+
+  /* The index panels keep their slow open/close: a panel growing in place and fading is
+     calm, not vestibular motion. Only the sideways slide and the picture zoom are dropped.
+     (base.css zeroes every transition with !important, so these need it too.) */
+  .row__panel { transition-duration: var(--glide-t) !important; }
+  .row__img { transition-duration: .7s !important; }
+  .row__ex { transition-duration: .6s !important; transform: none !important; }
+  .row a::before { transition-duration: var(--glide-t) !important; }
+  .row, .row__n { transition-duration: .6s !important; }
+  .row__panel-in, .row.is-open .row__panel-in,
+  .row.is-open .row__t, .row__img img { transform: none !important; }
 }

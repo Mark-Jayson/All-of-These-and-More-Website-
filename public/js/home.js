@@ -461,7 +461,6 @@
       .join('');
 
     // Hovering a row opens a panel under it: the picture on top, then the excerpt.
-    // A short hover-intent delay stops rows flapping open while the cursor sweeps past.
     let openRow = null, intentT, shutT;
     const load = (row) => {
       const img = $('.row__img img', row);
@@ -485,12 +484,24 @@
     };
     if (!touch) {
       list.addEventListener('pointerover', (e) => {
+        // No hover-intent delay: every row the cursor crosses starts opening at once, and the
+        // one it left starts closing. CSS transitions reverse from wherever they are, so a fast
+        // sweep leaves a trail of rows that only part-opened before gliding shut again.
         const row = e.target.closest('.row[data-id]');
-        if (!row || row === openRow) return clearTimeout(intentT);
-        load(row); // start fetching the picture while the intent timer runs
-        clearTimeout(intentT);
-        intentT = setTimeout(() => open(row), openRow ? 160 : 90);
+        if (row) open(row);
       });
+      // Fetch and decode every row picture once the index nears the viewport, so no
+      // image decode lands in the middle of an open animation.
+      const pre = new IntersectionObserver((entries) => {
+        if (!entries.some((en) => en.isIntersecting)) return;
+        pre.disconnect();
+        const warm = () => list.querySelectorAll('.row[data-id]').forEach((row) => {
+          load(row);
+          $('.row__img img', row)?.decode?.().catch(() => {});
+        });
+        'requestIdleCallback' in window ? requestIdleCallback(warm, { timeout: 1500 }) : setTimeout(warm, 200);
+      }, { rootMargin: '600px 0px' });
+      pre.observe(list);
       list.addEventListener('pointerleave', () => {
         clearTimeout(intentT);
         shutT = setTimeout(shut, 250);
